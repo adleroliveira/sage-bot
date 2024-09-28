@@ -1,0 +1,22 @@
+{
+  "name": "sage-bot",
+  "version": "1.0.0",
+  "description": "SAGE (Solutions Architect Guidance Engine), an AWS expert focused on the Well-Architected Framework.",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start:frontend": "npm run start -w packages/frontend",
+    "build:frontend": "npm run build -w packages/frontend",
+    "test:frontend": "npm run test -w packages/frontend",
+    "build:backend": "npm run build -w packages/backend",
+    "test:backend": "npm run test -w packages/backend",
+    "deploy:infra": "npm run deploy -w packages/infrastructure",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
