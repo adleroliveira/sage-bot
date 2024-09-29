@@ -19,10 +19,10 @@ export class AudioService {
   constructor(bucketName: string) {
     this.bucketName = bucketName;
     this.audioGenerator = new AWSPollyStrategy({
-      region: process.env.AWS_REGION || "us-east-1",
+      region: process.env.AWS_REGION || "us-wes-2",
     });
     this.publisher = new S3PublishingStrategy(
-      process.env.AWS_REGION || "us-east-1",
+      process.env.AWS_REGION || "us-west-2",
       bucketName
     );
   }
@@ -46,6 +46,6 @@ export class AudioService {
       "audio/mp3"
     );
 
-    return filePath;
+    return fileName;
   }
 }

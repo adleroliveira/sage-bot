@@ -17,6 +17,8 @@
     "@aws-sdk/client-polly": "^3.x.x",
     "@aws-sdk/client-s3": "^3.x.x",
     "@aws-sdk/util-stream-node": "^3.x.x",
-    "microservice-framework": "github:adleroliveira/microservice-framework#main"
+    "@types/ws": "^8.5.12",
+    "microservice-framework": "github:adleroliveira/microservice-framework#main",
+    "ws": "^8.18.0"
   }
 }

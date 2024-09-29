@@ -21,8 +21,7 @@ export interface LLMConfig {
   maxTokens: number;
 }
 
-export interface LLMServiceConfig {
-  llmConfig: LLMConfig;
+export interface LLMServiceConfig extends LLMConfig {
   defaultLanguage: SupportedLanguage;
   bucketName: string;
 }
@@ -41,20 +40,20 @@ export class LLMService {
   private publisher: S3PublishingStrategy;
 
   constructor(config: LLMServiceConfig) {
+    this.config = config;
     this.llmTextProvider = this.createLLMTextProvider();
     this.llmImageProvider = this.createLLMImageProvider();
     this.publisher = new S3PublishingStrategy(
-      process.env.AWS_REGION || "us-east-1",
+      process.env.AWS_REGION || "us-west-2",
       config.bucketName
     );
-    this.config = config;
   }
 
   private createLLMTextProvider(): LLMProvider {
     return createLLMProvider({
-      provider: this.config.llmConfig.llmTextProvider,
+      provider: this.config.llmTextProvider,
       config: {
-        modelId: this.config.llmConfig.llmTextModelId,
+        modelId: this.config.llmTextModelId,
         supportedModes: [LLMMode.TEXT],
       },
     });
@@ -62,9 +61,9 @@ export class LLMService {
 
   private createLLMImageProvider(): LLMProvider {
     return createLLMProvider({
-      provider: this.config.llmConfig.llmImageProvider,
+      provider: this.config.llmImageProvider,
       config: {
-        modelId: this.config.llmConfig.llmImageModelId,
+        modelId: this.config.llmImageModelId,
         supportedModes: [LLMMode.IMAGE],
       },
     });
@@ -102,6 +101,6 @@ export class LLMService {
       fileName,
       "image/png"
     );
-    return imagePath;
+    return fileName;
   }
 }

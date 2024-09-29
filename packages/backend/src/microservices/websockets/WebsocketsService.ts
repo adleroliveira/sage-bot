@@ -9,6 +9,7 @@ import {
 import { ChatbotBackend } from "../chatbot/ChatbotService";
 import { WebsocketConnection } from "./WebsocketConnection";
 import WebSocket from "ws";
+import http from "http";
 
 export interface WebsocketServiceInput {}
 export interface WebsocketServiceOutput {}
@@ -27,6 +28,7 @@ export class WebsocketService extends MicroserviceFramework<
   private wsport: number;
   private wss!: WebSocket.Server;
   private authToken: string;
+  private httpServer!: http.Server;
 
   constructor(backend: ChatbotBackend, config: WebsocketServiceConfig) {
     super(backend, config);
@@ -37,8 +39,19 @@ export class WebsocketService extends MicroserviceFramework<
 
   private async initializeWebsocketService() {
     try {
-      this.wss = new WebSocket.Server({ port: this.wsport });
-      this.info(`WebSocket server started on port ${this.wsport}`);
+      this.httpServer = http.createServer((req, res) => {
+        if (req.url === "/health") {
+          res.writeHead(200);
+          res.end("OK");
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+      this.wss = new WebSocket.Server({ port: this.wsport, host: "0.0.0.0" });
+      this.httpServer.listen(8081, "0.0.0.0", () => {
+        this.info(`WebSocket server started on port ${this.wsport}`);
+      });
       this.wss.on("connection", this.handleWsConnect.bind(this));
     } catch (error) {
       throw new Error("Error while trying to create Websocket Server");

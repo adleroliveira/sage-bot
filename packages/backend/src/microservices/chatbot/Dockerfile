@@ -1,11 +1,23 @@
 FROM node:20
-
+ARG CACHE_BUST
 WORKDIR /usr/src/app
 
-COPY package*.json ./
+# Copy root package.json and workspace package.json files
+COPY package.json .
+COPY packages/backend/package.json ./packages/backend/
 
-RUN npm ci --only=production
+# Install dependencies
+RUN npm install
 
-COPY . .
+# Copy the backend code
+COPY packages/backend ./packages/backend
 
-CMD [ "node", "dist/src/microservices/chatbot/index.js" ]
+# Build the backend
+RUN npm run build:backend
+
+# Prune dev dependencies
+RUN npm prune --production
+
+WORKDIR /usr/src/app/packages/backend
+
+CMD [ "node", "dist/microservices/chatbot/index.js" ]

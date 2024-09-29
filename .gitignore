@@ -1,2 +1,6 @@
 node_modules
 packages/backend/dist
+cdk.out/
+.cdk.staging
+cdk.out
+.env

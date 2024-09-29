@@ -20,10 +20,9 @@ export interface ChatbotConfig extends IServerConfig {
   goal: string;
   memoryCompressionThreshold?: number; // string length
   retryDelay?: number;
-  llmConfig: LLMServiceConfig;
   botResponseMaxTokens?: number;
   compressedMemoryMaxTokens?: number;
-  bucketName: string;
+  llmConfig: LLMServiceConfig;
 }
 export interface ChatbotBackend extends IBackEnd {
   createTable: (name: string) => ITable<any>;
@@ -72,7 +71,7 @@ export class ChatbotService extends MicroserviceFramework<
 
   constructor(backend: ChatbotBackend, config: ChatbotConfig) {
     super(backend, config);
-    this.bucketName = config.bucketName;
+    this.bucketName = config.llmConfig.bucketName;
     this.audioService = new AudioService(this.bucketName);
     this.memoryCompressionThreshold = config.memoryCompressionThreshold || 3000;
     this.memoryTable = backend.createTable("chatbot-memory");

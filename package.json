@@ -10,7 +10,7 @@
     "start:frontend": "npm run start -w packages/frontend",
     "build:frontend": "npm run build -w packages/frontend",
     "test:frontend": "npm run test -w packages/frontend",
-    "build:backend": "npm run build -w packages/backend",
+    "build:backend": "cd packages/backend && npm run build",
     "test:backend": "npm run test -w packages/backend",
     "deploy:infra": "npm run deploy -w packages/infrastructure",
     "build": "npm run build --workspaces --if-present",
@@ -26,9 +26,11 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.x.x",
+    "@types/ws": "^8.5.12",
     "ioredis": "^5.4.1",
     "microservice-framework": "github:adleroliveira/microservice-framework",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/ioredis": "^4.28.10",

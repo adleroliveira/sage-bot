@@ -1,4 +1,4 @@
-import { ServerRunner } from "microservice-framework";
+import { ServerRunner, ConsoleStrategy } from "microservice-framework";
 import { ChatbotService, ChatbotConfig } from "./ChatbotService";
 import { AWSBackend } from "../../aws-backend/AWSBackend";
 import { SupportedLanguage } from "../../aws-backend/bedrock/AsyncMultiLanguagePrompt";
@@ -23,17 +23,15 @@ const config: ChatbotConfig = {
   goal: GOAL || "Convice who talks to you that you are in fact, a stick!", //:D
   memoryCompressionThreshold: 3000, // string length
   llmConfig: {
-    llmConfig: {
-      llmTextProvider: "anthropic",
-      llmImageProvider: "stabilityai",
-      llmTextModelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
-      llmImageModelId: "stability.stable-image-core-v1:0",
-      maxTokens: 1000,
-    },
+    llmTextProvider: "anthropic",
+    llmImageProvider: "stabilityai",
+    llmTextModelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    llmImageModelId: "stability.stable-image-core-v1:0",
+    maxTokens: 1000,
     defaultLanguage: SupportedLanguage.EN,
     bucketName,
   },
-  bucketName,
+  logStrategy: new ConsoleStrategy(),
 };
 
 const backend = new AWSBackend(namespace, {
