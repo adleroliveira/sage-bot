@@ -16,7 +16,23 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "keywords": [
+    "Amazon Bedrock",
+    "Generative AI",
+    "Chatbot",
+    "Solutions Architect"
+  ],
+  "author": "Adler Oliveira",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.x.x",
+    "ioredis": "^5.4.1",
+    "microservice-framework": "github:adleroliveira/microservice-framework",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/ioredis": "^4.28.10",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.6.2"
+  }
 }
