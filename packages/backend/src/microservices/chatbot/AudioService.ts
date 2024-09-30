@@ -32,7 +32,7 @@ export class AudioService {
     fileName: string,
     config?: AWSPollyConfig
   ) {
-    const audioBuffer = this.audioGenerator.convertToAudio(text, {
+    const audioBuffer = await this.audioGenerator.convertToAudio(text, {
       ...this.baseAudioConfig,
       ...config,
     });

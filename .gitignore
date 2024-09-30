@@ -4,3 +4,4 @@ cdk.out/
 .cdk.staging
 cdk.out
 .env
+tsconfig.tsbuildinfo
