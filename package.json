@@ -1,7 +1,7 @@
 {
   "name": "sage-bot",
   "version": "1.0.0",
-  "description": "SAGE (Solutions Architect Guidance Engine), an AWS expert focused on the Well-Architected Framework.",
+  "description": "SAGE (Solutions Architect GenAI Engine), an AWS expert focused on the Well-Architected Framework.",
   "private": true,
   "workspaces": [
     "packages/*"

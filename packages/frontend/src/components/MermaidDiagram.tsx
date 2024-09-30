@@ -31,10 +31,12 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
         let decodedChart: string;
         try {
           decodedChart = atob(chart);
-          // decodedChart = decodedChart.replace(/^MERMAID_START\n|\nMERMAID_END$/g, '').trim();
         } catch (e) {
           decodedChart = chart;
         }
+
+        // Safety mechanism to convert "\n" into actual line breaks
+        decodedChart = decodedChart.replace(/\\n/g, '\n');
 
         const { svg } = await mermaid.render('mermaid-diagram', decodedChart);
         containerRef.current!.innerHTML = svg;

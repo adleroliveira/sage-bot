@@ -3,8 +3,9 @@ import {
   AWSPollyStrategy,
 } from "../../aws-backend/AWSPollyStrategy";
 import { S3PublishingStrategy } from "../../aws-backend/S3PublishingStrategy";
+import { Loggable } from "microservice-framework"
 
-export class AudioService {
+export class AudioService extends Loggable {
   private publisher: S3PublishingStrategy;
   private bucketName: string;
   private audioGenerator: AWSPollyStrategy;
@@ -17,6 +18,7 @@ export class AudioService {
   };
 
   constructor(bucketName: string) {
+    super();
     this.bucketName = bucketName;
     this.audioGenerator = new AWSPollyStrategy({
       region: process.env.AWS_REGION || "us-wes-2",
@@ -42,9 +44,11 @@ export class AudioService {
 
     const filePath = await this.publisher.publishTo(
       audioBuffer,
-      `${this.bucketName}/${normalizedFileName}`,
+      `${normalizedFileName}`,
       "audio/mp3"
     );
+
+    this.info(`Audio file ${filePath} generated`);
 
     return fileName;
   }

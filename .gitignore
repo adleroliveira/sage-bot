@@ -5,3 +5,4 @@ cdk.out/
 cdk.out
 .env
 tsconfig.tsbuildinfo
+/packages/backend/tsconfig.tsbuildinfo
