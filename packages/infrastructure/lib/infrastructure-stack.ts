@@ -4,6 +4,7 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecs_patterns from "aws-cdk-lib/aws-ecs-patterns";
 import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -79,24 +80,6 @@ export class InfrastructureStack extends cdk.Stack {
       objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_ENFORCED, // Required for OAC
     });
 
-    // Create CloudFront distribution
-    const distribution = new cloudfront.Distribution(
-      this,
-      "SagebotDistribution",
-      {
-        defaultBehavior: {
-          origin: origins.S3BucketOrigin.withOriginAccessControl(bucket, {
-            originAccessLevels: [cloudfront.AccessLevel.READ],
-          }),
-          viewerProtocolPolicy:
-            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
-        },
-        defaultRootObject: "index.html",
-      }
-    );
-
     const taskRole = new iam.Role(this, "ChatbotTaskRole", {
       assumedBy: new iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
     });
@@ -117,9 +100,6 @@ export class InfrastructureStack extends cdk.Stack {
               path.join(__dirname, "..", "..", ".."),
               {
                 file: "packages/backend/src/microservices/websockets/Dockerfile",
-                buildArgs: {
-                  CACHE_BUST: new Date().getTime().toString(),
-                },
               }
             ),
             environment: {
@@ -174,6 +154,12 @@ export class InfrastructureStack extends cdk.Stack {
       "Allow outbound traffic to Redis"
     );
 
+    websocketsSecurityGroup.addEgressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(8080),
+      "Allow outbound WebSocket traffic"
+    );
+
     websocketsSecurityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(8080),
@@ -185,6 +171,69 @@ export class InfrastructureStack extends cdk.Stack {
       ec2.Port.tcp(8081),
       "Allow inbound health check traffic"
     );
+
+    const distribution = new cloudfront.Distribution(
+      this,
+      "SagebotDistribution",
+      {
+        defaultBehavior: {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(bucket, {
+            originAccessLevels: [cloudfront.AccessLevel.READ],
+          }),
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        },
+        additionalBehaviors: {
+          "/ws/*": {
+            origin: new origins.LoadBalancerV2Origin(
+              websocketsService.loadBalancer,
+              {
+                protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+                httpPort: 8080,
+                readTimeout: cdk.Duration.seconds(60),
+              }
+            ),
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+            originRequestPolicy: new cloudfront.OriginRequestPolicy(
+              this,
+              "WebSocketPolicy",
+              {
+                headerBehavior:
+                  cloudfront.OriginRequestHeaderBehavior.allowList(
+                    "Sec-WebSocket-Key",
+                    "Sec-WebSocket-Version",
+                    "Sec-WebSocket-Protocol",
+                    "Sec-WebSocket-Accept",
+                    "Sec-WebSocket-Extensions",
+                    "Host"
+                  ),
+              }
+            ),
+          },
+        },
+        defaultRootObject: "index.html",
+        errorResponses: [
+          {
+            httpStatus: 404,
+            responseHttpStatus: 200,
+            responsePagePath: "/index.html",
+          },
+        ],
+      }
+    );
+
+    new s3deploy.BucketDeployment(this, "DeployFrontend", {
+      sources: [
+        s3deploy.Source.asset(path.join(__dirname, "../../frontend/build")),
+      ],
+      destinationBucket: bucket,
+      distribution: distribution,
+      distributionPaths: ["/*"],
+    });
 
     redisSecurityGroup.addIngressRule(
       websocketsSecurityGroup,
@@ -228,9 +277,6 @@ export class InfrastructureStack extends cdk.Stack {
         path.join(__dirname, "..", "..", ".."),
         {
           file: "packages/backend/src/microservices/chatbot/Dockerfile",
-          buildArgs: {
-            CACHE_BUST: new Date().getTime().toString(),
-          },
         }
       ),
       environment: {
@@ -238,7 +284,6 @@ export class InfrastructureStack extends cdk.Stack {
         REDIS_PORT: redis.attrRedisEndpointPort,
         BUCKET_NAME: bucket.bucketName,
         CLOUDFRONT_DOMAIN: distribution.distributionDomainName,
-        DEPLOYMENT_TIME: new Date().toISOString(),
       },
       logging: new ecs.AwsLogDriver({ streamPrefix: "ChatbotService" }),
       healthCheck: {
@@ -286,8 +331,8 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "WebSocketConnectionURL", {
-      value: `ws://${websocketsService.loadBalancer.loadBalancerDnsName}`,
-      description: "WebSocket Connection URL",
+      value: `wss://${distribution.distributionDomainName}/ws`,
+      description: "WebSocket Secure Connection URL via CloudFront",
     });
   }
 }

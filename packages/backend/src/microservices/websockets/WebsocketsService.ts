@@ -48,13 +48,47 @@ export class WebsocketService extends MicroserviceFramework<
           res.end();
         }
       });
-      this.wss = new WebSocket.Server({ port: this.wsport, host: "0.0.0.0" });
-      this.httpServer.listen(8081, "0.0.0.0", () => {
+
+      this.wss = new WebSocket.Server({ noServer: true });
+
+      this.httpServer.on("upgrade", (request, socket, head) => {
+        const pathname = request.url
+          ? new URL(request.url, `http://${request.headers.host}`).pathname
+          : null;
+
+        this.info("Received upgrade request", { pathname });
+
+        if (pathname && pathname.startsWith("/ws")) {
+          this.wss.handleUpgrade(request, socket, head, (ws) => {
+            this.wss.emit("connection", ws, request);
+          });
+        } else {
+          socket.destroy();
+        }
+      });
+
+      this.httpServer.listen(this.wsport, "0.0.0.0", () => {
         this.info(`WebSocket server started on port ${this.wsport}`);
       });
+
       this.wss.on("connection", this.handleWsConnect.bind(this));
+
+      // Start the health check server on port 8081
+      const healthServer = http.createServer((req, res) => {
+        if (req.url === "/health") {
+          res.writeHead(200);
+          res.end("OK");
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+
+      healthServer.listen(8081, "0.0.0.0", () => {
+        this.info("Health check server started on port 8081");
+      });
     } catch (error) {
-      throw new Error("Error while trying to create Websocket Server");
+      throw new Error("Error while trying to create WebSocket Server");
     }
   }
 
