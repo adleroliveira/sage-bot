@@ -4,6 +4,8 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 
+import { Readable } from "stream";
+
 export interface IPublishingStrategy {
   publishTo(data: any, path: string, contentType: string): Promise<string>;
   readFrom(path: string): Promise<any>;
@@ -35,7 +37,7 @@ export class S3PublishingStrategy implements IPublishingStrategy {
     return `s3://${this.bucketName}/${path}`;
   }
 
-  async readFrom(path: string): Promise<any> {
+  async readFrom(path: string): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: path,
@@ -47,23 +49,32 @@ export class S3PublishingStrategy implements IPublishingStrategy {
       throw new Error("Empty response body");
     }
 
-    // Convert the ReadableStream to a string
-    const streamToString = (stream: ReadableStream) =>
-      new Promise((resolve, reject) => {
-        const chunks: Uint8Array[] = [];
-        const reader = stream.getReader();
-        reader
-          .read()
-          .then(function process({ done, value }): any {
-            if (done) {
-              return resolve(Buffer.concat(chunks).toString("utf-8"));
-            }
-            chunks.push(value);
-            return reader.read().then(process);
-          })
-          .catch(reject);
-      });
+    const body = response.Body;
 
-    return streamToString(response.Body as ReadableStream);
+    // Check if body is a Readable stream
+    if (body instanceof Readable) {
+      return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        body.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        body.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+        body.on("error", reject);
+      });
+    } else if (body instanceof Blob) {
+      // If it's a Blob (for browser environments)
+      return await body.text();
+    } else if (typeof body.transformToString === "function") {
+      // If it's an SDK v3 stream with transformToString method
+      return await body.transformToString();
+    } else {
+      // If it's another type of stream or unknown type
+      const streamToString = async (stream: any): Promise<string> => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) {
+          chunks.push(Buffer.from(chunk));
+        }
+        return Buffer.concat(chunks).toString("utf-8");
+      };
+      return await streamToString(body);
+    }
   }
 }

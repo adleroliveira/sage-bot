@@ -13,6 +13,7 @@ import { AgentFrameworkPrompt } from "./AgentFramework";
 import { MemoryCompressorPrompt } from "./MemoryCompressor";
 import { SupportedLanguage } from "../../aws-backend/bedrock/AsyncMultiLanguagePrompt";
 import { AudioService } from "./AudioService";
+import { S3PublishingStrategy } from "../../aws-backend/S3PublishingStrategy";
 
 export interface ChatbotRequest {}
 export interface ChatbotResponse {}
@@ -34,6 +35,7 @@ interface BotResponse {
   content: string;
   success?: boolean;
   language?: string;
+  memory_id?: string;
 }
 
 interface OutputMessage {
@@ -68,6 +70,7 @@ export class ChatbotService extends MicroserviceFramework<
   private botResponseMaxTokens: number;
   private compressedMemoryMaxTokens: number;
   private audioService: AudioService;
+  private publisher: S3PublishingStrategy;
 
   constructor(backend: ChatbotBackend, config: ChatbotConfig) {
     super(backend, config);
@@ -80,6 +83,10 @@ export class ChatbotService extends MicroserviceFramework<
     this.llmService = new LLMService(config.llmConfig);
     this.botResponseMaxTokens = config.botResponseMaxTokens || 1000;
     this.compressedMemoryMaxTokens = config.compressedMemoryMaxTokens || 5000;
+    this.publisher = new S3PublishingStrategy(
+      process.env.AWS_REGION || "us-west-2",
+      this.bucketName
+    );
   }
 
   @RequestHandler<IRequest<InputMessage>>("message")
@@ -108,8 +115,6 @@ export class ChatbotService extends MicroserviceFramework<
       JSON.stringify({ source: input.source, message: input.content })
     );
 
-    this.info("Bot response", response);
-
     if (!response)
       return [
         {
@@ -128,6 +133,7 @@ export class ChatbotService extends MicroserviceFramework<
       const results: OutputMessage[] = [];
       for (const botResponse of botResponses) {
         const { result, memoryUpdate } = await this.processBotResponse(
+          memory,
           botResponse,
           sessionId
         );
@@ -136,10 +142,7 @@ export class ChatbotService extends MicroserviceFramework<
       }
 
       // Update memory after processing all responses
-      this.info("Updated memory", memory);
       await this.updateMemory(sessionId, memory);
-
-      this.info("Bot responses", results);
       return results;
     } catch (e: any) {
       this.warn(
@@ -157,7 +160,11 @@ export class ChatbotService extends MicroserviceFramework<
     setTimeout(async () => {
       const interactionResponses = await this.interact(sessionId, {
         source: "system",
-        content: `Your last message provoked a JSON parsing error. Make sure your responses won't throw JSON.parse() errors.`,
+        content: `
+          Your last message provoked a JSON parsing error.
+          Make sure it don't happen again.
+          Appologise to the user for the small delay and try a different approach answer their request.
+        `,
       });
       this.warn("Sending message to user after error", interactionResponses);
       this.sendToUser(sessionId, JSON.stringify(interactionResponses));
@@ -173,10 +180,11 @@ export class ChatbotService extends MicroserviceFramework<
   }
 
   private async processBotResponse(
+    memory: string,
     botResponse: BotResponse,
     sessionId: string
   ): Promise<{ result: OutputMessage; memoryUpdate: string }> {
-    const { action, content, language } = botResponse;
+    const { action, content, language, memory_id } = botResponse;
     let result: OutputMessage = { text: "" };
     let memoryUpdate = "";
 
@@ -198,7 +206,7 @@ export class ChatbotService extends MicroserviceFramework<
       case "send-audio":
         const audioFilePath = await this.createAudio(
           decodedContent,
-          `audio/${sessionId}-${uuidv4()}.mp3`
+          `sessions/${sessionId}/audio/${uuidv4()}.mp3`
         );
         result.audio = audioFilePath;
         memoryUpdate = "\nAgent: [audio]" + decodedContent + "[/audio]";
@@ -206,7 +214,7 @@ export class ChatbotService extends MicroserviceFramework<
       case "send-image":
         const imagePath = await this.createImage(
           decodedContent,
-          `images/${sessionId}-${uuidv4()}.png`
+          `sessions/${sessionId}/images/${uuidv4()}.png`
         );
         result.image = imagePath;
         memoryUpdate = "\nAgent: [image]" + decodedContent + "[/image]";
@@ -218,6 +226,52 @@ export class ChatbotService extends MicroserviceFramework<
       case "send-diagram":
         result.diagram = decodedContent;
         memoryUpdate = "\nAgent: [diagram]" + decodedContent + "[/diagram]";
+        break;
+      case "save-memory":
+        if (memory_id && decodedContent) {
+          const safe_memory_id = sanitizeS3Filename(memory_id);
+          await this.publisher.publishTo(
+            `${memory}\n${decodedContent}`,
+            `memories/${safe_memory_id}.txt`,
+            "text/plain"
+          );
+          result.text = `Memory saved with id: ${safe_memory_id}`;
+          memoryUpdate = `\nSystem: Memory persisted with id: ${safe_memory_id}`;
+        } else {
+          result.text =
+            "I am sorry. I had some problems while storing our conversation. Would you like me to try again?";
+          memoryUpdate =
+            "\nSystem: Memory could not be saved.\nAgent: I am sorry. I had some problems while storing our conversation. Would you like me to try again?";
+        }
+        break;
+      case "load-memory":
+        if (memory_id && decodedContent) {
+          try {
+            const memory_content = await this.publisher.readFrom(
+              `memories/${memory_id}.txt`
+            );
+            if (!memory_content) {
+              this.warn(`Couldn't retrieve memory with id: ${memory_id}`);
+              throw new Error("Couldn't retrieve memory");
+            }
+            result.text = `Memory loaded with id: ${memory_id}`;
+            memoryUpdate = `\nSystem: Memory loaded with id: ${memory_id}\n${memory_content}`;
+            // process.nextTick(async () => {
+            //   const interactionResponses = await this.interact(sessionId, {
+            //     source: "system",
+            //     content: `Memory with id: ${memory_id} retrieved`,
+            //   });
+            //   this.info("memory successfuly retrieved", memory_content);
+            //   this.sendToUser(sessionId, JSON.stringify(interactionResponses));
+            // });
+          } catch (error: any) {
+            this.error("Coundn't retrieve memory", error);
+            result.text =
+              "I am sorry. I couldn't retrieve our previous conversation. What were our conversation about?";
+            memoryUpdate =
+              "\nSystem: Memory couldn't be retrieved.\nAgent: I am sorry. I couldn't retrieve our previous conversation. What were our conversation about?";
+          }
+        }
         break;
       default:
         throw new Loggable.LoggableError(
@@ -248,7 +302,6 @@ export class ChatbotService extends MicroserviceFramework<
         );
       }
     } catch (error) {
-      this.memoryTable.delete(sessionId);
       this.warn("Error sending message to user, removing memory");
     }
   }
@@ -327,4 +380,28 @@ function sanitizeResponseContent(input: string): string {
       }`;
     }
   );
+}
+
+function sanitizeS3Filename(filename: string): string {
+  // Convert to ASCII characters and remove non-ASCII
+  filename = filename.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+
+  // Replace spaces with underscores
+  filename = filename.replace(/\s/g, "_");
+
+  // Remove any character that isn't alphanumeric, underscore, hyphen, or period
+  filename = filename.replace(/[^\w\-\.]/g, "");
+
+  // Ensure the filename doesn't start with a period (hidden file in Unix-like systems)
+  filename = filename.replace(/^\./, "");
+
+  // Truncate to 1024 characters (S3 object key limit is 1024 bytes)
+  filename = filename.slice(0, 1024);
+
+  // If filename is empty after sanitization, provide a default
+  if (filename.length === 0) {
+    filename = "untitled";
+  }
+
+  return filename;
 }
