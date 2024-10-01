@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box, TextField, Button, Typography, CircularProgress } from '@mui/material';
-import FavoriteIcon from '@mui/icons-material/Favorite';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { CommunicationsManager } from 'communications-manager';
@@ -287,7 +286,7 @@ const ChatBot: React.FC = () => {
         >
           <SmartToyIcon sx={{ fontSize: 32, mr: 2, color: '#ff9900' }} />
           <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>
-            SAGE (Solutions Architect GenAI Engine)
+            SAGE (Solutions Architect Guidance Engine)
           </Typography>
         </Box>
         <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: '#ffffff' }}>
@@ -332,7 +331,7 @@ const ChatBot: React.FC = () => {
                 )}
                 {message.image && (
                   <img
-                    src={message.image.replace("/usr/src/app/public", "")}
+                    src={message.image}
                     alt="Content sent by bot"
                     style={{
                       maxWidth: '100%',
@@ -344,7 +343,7 @@ const ChatBot: React.FC = () => {
                   />
                 )}
                 {message.audio && (
-                  <AudioPlayer key={message.audio} audioUrl={message.audio.replace("/usr/src/app/public", "")} />
+                  <AudioPlayer key={message.audio} audioUrl={message.audio} />
                 )}
                 {message.choice && (
                   <Box sx={{ mt: 2 }}>
@@ -440,31 +439,6 @@ const ChatBot: React.FC = () => {
               <SendIcon />
             </Button>
           </Box>
-        </Box>
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 8,
-            right: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-            color: 'grey.500',
-            fontSize: '0.75rem',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="caption" sx={{ mr: 0.5 }}>
-              Built with
-            </Typography>
-            <FavoriteIcon sx={{ fontSize: '0.75rem', color: 'grey.500' }} />
-            <Typography variant="caption" sx={{ ml: 0.5 }}>
-              by Adler Oliveira
-            </Typography>
-          </Box>
-          <Typography variant="caption">
-            Principal Solutions Architect (santoliv@amazon.com)
-          </Typography>
         </Box>
       </Box>
     </Box>
