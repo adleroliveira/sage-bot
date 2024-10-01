@@ -448,7 +448,7 @@ const ChatBot: React.FC = () => {
                 )}
                 {message.image && (
                   <img
-                    src={message.image.replace("/usr/src/app/public", "")}
+                    src={message.image}
                     alt="Content sent by bot"
                     style={{
                       maxWidth: '100%',
@@ -460,7 +460,7 @@ const ChatBot: React.FC = () => {
                   />
                 )}
                 {message.audio && (
-                  <AudioPlayer key={message.audio} audioUrl={message.audio.replace("/usr/src/app/public", "")} />
+                  <AudioPlayer key={message.audio} audioUrl={message.audio} />
                 )}
                 {message.choice && (
                   <Box sx={{ mt: 2 }}>
