@@ -1,5 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, TextField, Button, Typography, CircularProgress } from '@mui/material';
+import { Box, TextField, Button, Typography, CircularProgress, IconButton, Popover, List, ListItem, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import HelpIcon from '@mui/icons-material/Help';
+import ImageIcon from '@mui/icons-material/Image';
+import AudiotrackIcon from '@mui/icons-material/Audiotrack';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import CodeIcon from '@mui/icons-material/Code';
+import StorageIcon from '@mui/icons-material/Storage';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -44,8 +50,7 @@ const ChatBot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isWaiting, setIsWaiting] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authToken, setAuthToken] = useState('');
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const commsManagerRef = useRef<CommunicationsManager | null>(null);
   const isInitialConnectionRef = useRef(true);
@@ -107,6 +112,17 @@ const ChatBot: React.FC = () => {
     }
     return error.message || "Unknown error occurred";
   };
+
+  const handleHelpOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleHelpClose = () => {
+    setAnchorEl(null);
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? 'help-popover' : undefined;
 
   const handleIncomingMessages = (newMessages: Message[]) => {
     console.log("Request Messages: ", newMessages);
@@ -200,58 +216,6 @@ const ChatBot: React.FC = () => {
 
   useEffect(scrollToBottom, [messages]);
 
-  // if (!isAuthenticated) {
-  //   return (
-  //     <Box
-  //       sx={{
-  //         display: 'flex',
-  //         justifyContent: 'center',
-  //         alignItems: 'center',
-  //         height: '100vh',
-  //         bgcolor: '#f2f3f3',
-  //         fontFamily: "'Amazon Ember', 'Helvetica Neue', Roboto, Arial, sans-serif",
-  //       }}
-  //     >
-  //       <Box
-  //         sx={{
-  //           width: '90%',
-  //           maxWidth: 400,
-  //           p: 3,
-  //           bgcolor: '#fff',
-  //           borderRadius: '8px',
-  //           boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
-  //         }}
-  //       >
-  //         <Typography variant="h5" component="h1" sx={{ mb: 2, fontWeight: 'bold', color: '#232f3e' }}>
-  //           Authentication
-  //         </Typography>
-  //         <TextField
-  //           fullWidth
-  //           variant="outlined"
-  //           label="Auth Token"
-  //           value={authToken}
-  //           onChange={(e) => setAuthToken(e.target.value)}
-  //           sx={{ mb: 2 }}
-  //         />
-  //         <Button
-  //           fullWidth
-  //           variant="contained"
-  //           onClick={handleAuthentication}
-  //           sx={{
-  //             bgcolor: '#ff9900',
-  //             color: '#fff',
-  //             '&:hover': {
-  //               bgcolor: '#e88b00',
-  //             },
-  //           }}
-  //         >
-  //           Submit
-  //         </Button>
-  //       </Box>
-  //     </Box>
-  //   );
-  // }
-
   return (
     <Box
       sx={{
@@ -276,6 +240,158 @@ const ChatBot: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <IconButton
+          aria-describedby={id}
+          onClick={handleHelpOpen}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: 16,
+            bgcolor: '#ff9900',
+            color: '#fff',
+            '&:hover': {
+              bgcolor: '#e88b00',
+            },
+          }}
+        >
+          <HelpIcon />
+        </IconButton>
+
+        <Popover
+          id={id}
+          open={open}
+          anchorEl={anchorEl}
+          onClose={handleHelpClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+          PaperProps={{
+            sx: {
+              width: 550,
+              borderRadius: '8px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            }
+          }}
+        >
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom sx={{ color: '#232f3e', fontWeight: 'bold' }}>
+              How to Use SAGE
+            </Typography>
+            <Typography variant="body2" paragraph sx={{ color: '#545b64' }}>
+              Ask any question you would ask an AWS Solutions Architect.
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" gutterBottom sx={{ color: '#232f3e', fontWeight: 'medium' }}>
+             Sage's abilities:
+            </Typography>
+            <List sx={{ mt: 2 }}>
+            <ListItem disablePadding>
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <ImageIcon sx={{ color: '#ff9900' }} />
+              </ListItemIcon>
+                <ListItemText 
+                  primary="Image Generation"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <AudiotrackIcon sx={{ color: '#ff9900' }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Audio Responses"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <AccountTreeIcon sx={{ color: '#ff9900' }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Architecture Diagrams"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <CodeIcon sx={{ color: '#ff9900' }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Code Samples"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <StorageIcon sx={{ color: '#ff9900' }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Store/Retrieve Conversations"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+            </List>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" gutterBottom sx={{ color: '#232f3e', fontWeight: 'medium' }}>
+              Example Prompts:
+            </Typography>
+            <List>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Please generate an architecture diagram for a Datalake"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Create a CDK code sample for deploying an ECS Cluster"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Send me an audio explaining Amazon Kinesis"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- What is your architecture?"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Simulate a Solutions Architect Associate AWS Certification question"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Who Built you?"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Can you send me an image of an Amazon building?"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemText 
+                  primary="- Please store our conversation with the id: sage_is_the_best"
+                  primaryTypographyProps={{ color: '#545b64' }}
+                />
+              </ListItem>
+            </List>
+          </Box>
+        </Popover>
         <Box
           sx={{
             bgcolor: '#232f3e', // AWS dark blue
@@ -287,7 +403,7 @@ const ChatBot: React.FC = () => {
         >
           <SmartToyIcon sx={{ fontSize: 32, mr: 2, color: '#ff9900' }} />
           <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold' }}>
-            SAGE (Solutions Architect GenAI Engine)
+            AWS SAGE (Solutions Architect GenAI Engine)
           </Typography>
         </Box>
         <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: '#ffffff' }}>
@@ -327,7 +443,7 @@ const ChatBot: React.FC = () => {
                       wordBreak: 'break-word',
                     }}
                   >
-                    {message.text}
+                    {message.text.replace(/\\n/g, '\n')}
                   </Typography>
                 )}
                 {message.image && (
