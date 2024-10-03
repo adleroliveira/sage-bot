@@ -14,6 +14,99 @@ import { MemoryCompressorPrompt } from "./MemoryCompressor";
 import { SupportedLanguage } from "../../aws-backend/bedrock/AsyncMultiLanguagePrompt";
 import { AudioService } from "./AudioService";
 import { S3PublishingStrategy } from "../../aws-backend/S3PublishingStrategy";
+import {
+  Workspace,
+  OperatingSystem,
+  LLMComputer,
+  Program,
+  InputType,
+} from "./LLMComputer";
+import { BlankPromptPrompt } from "./BlankPrompt";
+
+class S3Workspace extends Workspace {
+  constructor(
+    private sessionId: string,
+    private publisher: S3PublishingStrategy
+  ) {
+    super();
+  }
+
+  async store(key: string, data: string): Promise<void> {
+    await this.publisher.publishTo(
+      data,
+      `${this.sessionId}/llmc/${key}`,
+      "text/plain"
+    );
+  }
+
+  async retrieve(key: string): Promise<string> {
+    return await this.publisher.readFrom(`${this.sessionId}/llmc/${key}`);
+  }
+}
+
+class ChatbotOS extends OperatingSystem {
+  constructor(
+    private sessionId: string,
+    private llmService: LLMService,
+    private sendToUser: (sessionId: string, text: string) => Promise<void>,
+    private maxTokens = 5000
+  ) {
+    super("ChatbotOS");
+    this.init();
+  }
+
+  private init() {
+    `
+    ChatbotOS
+    - you can perform complex, multi-step tasks by leveraging your computing architecture.
+    - When receiving a request, first plan what are the steps needed to complete it, then prepare all you future actions to do it before starting it.
+    - Constantly update your user about what you are doing or planing to do.
+    - When you are done, send the final result to the user.
+    - Ask for clarification or additional information when needed.
+    - Focus on your prime directive (specified by the program).
+    - DON'T SEND ANY RESPONSE THAT IS NOT AN ACTION.
+    `
+      .split("\n")
+      .forEach((line) => this.addInstruction(line));
+  }
+
+  private async getText(prompt: string): Promise<string> {
+    const data = new BlankPromptPrompt({ prompt });
+
+    const response = await this.llmService.generateText(
+      data,
+      SupportedLanguage.EN,
+      this.maxTokens
+    );
+    if (!response) throw new Error("No response from LLM");
+    return response;
+  }
+
+  public async runPrompt(prompt: string): Promise<string> {
+    return await this.getText(prompt);
+  }
+
+  public async sendDataToUser(data: string): Promise<void> {
+    await this.sendToUser(this.sessionId, JSON.stringify([{ text: data }]));
+  }
+}
+
+class FriendlyBotProgram extends Program {
+  constructor(instructions: string) {
+    super();
+    this.init(instructions);
+  }
+
+  private init(instructions: string) {
+    instructions.split("\n").forEach((line) => this.addInstruction(line));
+  }
+}
+
+const programStr = `
+UltraFriendlyHelpfulBot program
+You are an ultra friendly and helpful assistant.
+Make many compliments and try to be as helpful as possible to the user.
+`;
 
 export interface ChatbotRequest {}
 export interface ChatbotResponse {}
@@ -71,6 +164,7 @@ export class ChatbotService extends MicroserviceFramework<
   private compressedMemoryMaxTokens: number;
   private audioService: AudioService;
   private publisher: S3PublishingStrategy;
+  private llcomputerSession: Map<string, LLMComputer> = new Map();
 
   constructor(backend: ChatbotBackend, config: ChatbotConfig) {
     super(backend, config);
@@ -107,53 +201,70 @@ export class ChatbotService extends MicroserviceFramework<
     sessionId: string,
     input: BotInputMessage
   ): Promise<OutputMessage[]> {
-    let memory = await this.getMemory(sessionId);
-    memory += "\n" + `${input.source}: ${input.content}`;
-
-    let response = await this.askBot(
-      memory,
-      JSON.stringify({ source: input.source, message: input.content })
-    );
-
-    if (!response)
-      return [
-        {
-          text: "I'm sorry, There was a problem while I tried to process that!",
-        },
-      ];
-
-    try {
-      const sanitizedResponse = sanitizeResponseContent(response);
-      let parsedResponse = JSON.parse(sanitizedResponse);
-
-      let botResponses: BotResponse[] = Array.isArray(parsedResponse)
-        ? parsedResponse
-        : [parsedResponse];
-
-      const results: OutputMessage[] = [];
-      for (const botResponse of botResponses) {
-        const { result, memoryUpdate } = await this.processBotResponse(
-          memory,
-          botResponse,
-          sessionId
-        );
-        results.push(result);
-        memory += memoryUpdate;
-      }
-
-      // Update memory after processing all responses
-      await this.updateMemory(sessionId, memory);
-      return results;
-    } catch (e: any) {
-      this.warn(
-        `An error occurred in the bot response, trying again in ${
-          this.retryDelay / 1000
-        } seconds`,
-        { error: e, response }
+    let llmc = this.llcomputerSession.get(sessionId);
+    if (!llmc) {
+      const os = new ChatbotOS(
+        sessionId,
+        this.llmService,
+        this.sendToUser.bind(this)
       );
-      this.scheduleRetry(sessionId);
-      return [{ text: "Let me think for a bit. Please, be patient..." }];
+      llmc = new LLMComputer({
+        memoryCompressor: this.compressMemory.bind(this),
+        workspace: new S3Workspace(sessionId, this.publisher),
+      });
+      llmc.boot(os, new FriendlyBotProgram(programStr));
+      llmc.start();
+      this.llcomputerSession.set(sessionId, llmc);
     }
+    llmc.processInput(input.content, InputType.User);
+    return [{ text: "" }];
+    // let memory = await this.getMemory(sessionId);
+    // memory += "\n" + `${input.source}: ${input.content}`;
+
+    // let response = await this.askBot(
+    //   memory,
+    //   JSON.stringify({ source: input.source, message: input.content })
+    // );
+
+    // if (!response)
+    //   return [
+    //     {
+    //       text: "I'm sorry, There was a problem while I tried to process that!",
+    //     },
+    //   ];
+
+    // try {
+    //   const sanitizedResponse = sanitizeResponseContent(response);
+    //   let parsedResponse = JSON.parse(sanitizedResponse);
+
+    //   let botResponses: BotResponse[] = Array.isArray(parsedResponse)
+    //     ? parsedResponse
+    //     : [parsedResponse];
+
+    //   const results: OutputMessage[] = [];
+    //   for (const botResponse of botResponses) {
+    //     const { result, memoryUpdate } = await this.processBotResponse(
+    //       memory,
+    //       botResponse,
+    //       sessionId
+    //     );
+    //     results.push(result);
+    //     memory += memoryUpdate;
+    //   }
+
+    //   // Update memory after processing all responses
+    //   await this.updateMemory(sessionId, memory);
+    //   return results;
+    // } catch (e: any) {
+    //   this.warn(
+    //     `An error occurred in the bot response, trying again in ${
+    //       this.retryDelay / 1000
+    //     } seconds`,
+    //     { error: e, response }
+    //   );
+    //   this.scheduleRetry(sessionId);
+    //   return [{ text: "Let me think for a bit. Please, be patient..." }];
+    // }
   }
 
   private scheduleRetry(sessionId: string): void {
