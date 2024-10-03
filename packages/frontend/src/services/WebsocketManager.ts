@@ -11,7 +11,8 @@ class WebSocketManagerSingleton {
   private constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/`;
+    // const wsUrl = `${protocol}//${host}/ws/`;
+    const wsUrl = `ws://localhost:8080/ws/`;
 
     this.config = {
       url: wsUrl,

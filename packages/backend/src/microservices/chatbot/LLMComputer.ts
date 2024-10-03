@@ -597,7 +597,7 @@ export class LLMComputer extends Loggable {
 
   constructor(config: LLMComputerConfig) {
     super();
-    this.tickFrequency = config.tickFrequency || 120000; // 1 min
+    this.tickFrequency = config.tickFrequency || 15000; // 1 min
     this.kernel = new Kernel();
     this.memory = new Memory(
       config.initialMemory || "",
@@ -655,7 +655,7 @@ export class LLMComputer extends Loggable {
     ].join("\n");
   }
 
-  private async tick() {
+  private async tick(): Promise<ActionResult[]> {
     if (this.nextTick) clearTimeout(this.nextTick);
     if (!this.input.size())
       this.input.addInput(
@@ -671,9 +671,7 @@ export class LLMComputer extends Loggable {
       this.feedback.clear();
       const resultsArray: ActionResult[] = [];
       for (const action of actions) {
-        this.info("action", action);
         const result = await this.operationSystem!.executeAction(action);
-        this.info("action result", result);
         resultsArray.push(result);
       }
       resultsArray.forEach((result) => {
@@ -684,15 +682,15 @@ export class LLMComputer extends Loggable {
             result.callbackId
           );
       });
-      console.log("Actions executed", resultsArray);
       console.log(this.compilePrompt());
+      if (!this.stack.size()) this.wait = true;
+      this.scheduleNextTick();
+      return resultsArray;
     } catch (error: any) {
       this.input.clear();
       console.error("Tick failed", error);
       throw new Error(error);
     }
-    if (!this.stack.size()) this.wait = true;
-    this.scheduleNextTick();
   }
 
   private parseActions(promptResult: string): Action[] {
@@ -760,13 +758,16 @@ export class LLMComputer extends Loggable {
     return this.heap;
   }
 
-  public async processInput(input: string, type: InputType): Promise<void> {
+  public async processInput(
+    input: string,
+    type: InputType
+  ): Promise<ActionResult[]> {
     console.log("Processing input", input, type);
     this.ensureBooted();
     this.input.addInput(input, type);
     await this.memory.store(`${type}: ${input}`);
     this.wait = false;
-    this.tick();
+    return await this.tick();
   }
 }
 

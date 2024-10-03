@@ -207,6 +207,9 @@ export class ChatbotService extends MicroserviceFramework<
         sessionId,
         this.llmService,
         this.sendToUser.bind(this)
+        // async (sessionId: string, text: string) => {
+        //   console.log("sending data to user", text);
+        // }
       );
       llmc = new LLMComputer({
         memoryCompressor: this.compressMemory.bind(this),
@@ -216,78 +219,8 @@ export class ChatbotService extends MicroserviceFramework<
       llmc.start();
       this.llcomputerSession.set(sessionId, llmc);
     }
-    llmc.processInput(input.content, InputType.User);
-    return [{ text: "" }];
-    // let memory = await this.getMemory(sessionId);
-    // memory += "\n" + `${input.source}: ${input.content}`;
-
-    // let response = await this.askBot(
-    //   memory,
-    //   JSON.stringify({ source: input.source, message: input.content })
-    // );
-
-    // if (!response)
-    //   return [
-    //     {
-    //       text: "I'm sorry, There was a problem while I tried to process that!",
-    //     },
-    //   ];
-
-    // try {
-    //   const sanitizedResponse = sanitizeResponseContent(response);
-    //   let parsedResponse = JSON.parse(sanitizedResponse);
-
-    //   let botResponses: BotResponse[] = Array.isArray(parsedResponse)
-    //     ? parsedResponse
-    //     : [parsedResponse];
-
-    //   const results: OutputMessage[] = [];
-    //   for (const botResponse of botResponses) {
-    //     const { result, memoryUpdate } = await this.processBotResponse(
-    //       memory,
-    //       botResponse,
-    //       sessionId
-    //     );
-    //     results.push(result);
-    //     memory += memoryUpdate;
-    //   }
-
-    //   // Update memory after processing all responses
-    //   await this.updateMemory(sessionId, memory);
-    //   return results;
-    // } catch (e: any) {
-    //   this.warn(
-    //     `An error occurred in the bot response, trying again in ${
-    //       this.retryDelay / 1000
-    //     } seconds`,
-    //     { error: e, response }
-    //   );
-    //   this.scheduleRetry(sessionId);
-    //   return [{ text: "Let me think for a bit. Please, be patient..." }];
-    // }
-  }
-
-  private scheduleRetry(sessionId: string): void {
-    setTimeout(async () => {
-      const interactionResponses = await this.interact(sessionId, {
-        source: "system",
-        content: `
-          Your last message provoked a JSON parsing error.
-          Make sure it don't happen again.
-          Appologise to the user for the small delay and try a different approach answer their request.
-        `,
-      });
-      this.warn("Sending message to user after error", interactionResponses);
-      this.sendToUser(sessionId, JSON.stringify(interactionResponses));
-    }, this.retryDelay);
-  }
-
-  private async getMemory(sessionId: string): Promise<string> {
-    return (await this.memoryTable.get(sessionId)) || "Agent: Hello there...";
-  }
-
-  private async updateMemory(sessionId: string, memory: string): Promise<void> {
-    await this.memoryTable.set(sessionId, await this.compressMemory(memory));
+    const llmcResponse = await llmc.processInput(input.content, InputType.User);
+    return llmcResponse.map((result) => ({ text: result.results }));
   }
 
   private async processBotResponse(
