@@ -32,18 +32,13 @@ export class RedisPubSubStrategy extends PubSubConsumer<RedisMessage> {
       this.redisClient.onMessage((channel, message) => {
         try {
           const parsedMessage = JSON.parse(message) as RedisMessage;
-          const messageWrapper: IMessage<RedisMessage> = {
-            id: this.generateMessageId(parsedMessage),
-            payload: parsedMessage,
-            timestamp: Date.now(),
-          };
 
           const handler = this.subscribedChannels.get(channel);
           if (handler) {
-            handler(messageWrapper);
+            handler(parsedMessage);
           }
 
-          this.emit("message", channel, messageWrapper);
+          this.emit("message", channel, parsedMessage);
         } catch (error: any) {
           console.error(`Failed to parse message: ${error.message}`);
           this.emit(

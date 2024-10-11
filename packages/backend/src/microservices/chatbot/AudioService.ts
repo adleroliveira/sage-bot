@@ -3,7 +3,7 @@ import {
   AWSPollyStrategy,
 } from "../../aws-backend/AWSPollyStrategy";
 import { S3PublishingStrategy } from "../../aws-backend/S3PublishingStrategy";
-import { Loggable } from "microservice-framework"
+import { Loggable } from "microservice-framework";
 
 export class AudioService extends Loggable {
   private publisher: S3PublishingStrategy;
